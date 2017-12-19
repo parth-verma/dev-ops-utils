@@ -21,7 +21,7 @@ tables = source.list_tables(Limit=10 * 4)['TableNames']
 tables.sort(key=lambda x: x.lower())
 for id, x in enumerate(tables):
     print(str(id) + '. ' + x)
-tables_num = list(map(int,input("Choose Table: ").strip().split()))
+tables_num = list(map(int, input("Choose Table: ").strip().split()))
 
 print("\nChoose Action:")
 
@@ -30,9 +30,9 @@ print("2. Copy Table")
 print("3. Create and Copy Table")
 action = int(input().strip())
 if not (0 < action < 4):
-        print("Invalid Action")
-        print("Quiting")
-        exit(1)
+    print("Invalid Action")
+    print("Quiting")
+    exit(1)
 
 for i in tables_num:
     table = tables[i]
@@ -48,10 +48,10 @@ for i in tables_num:
     try:
         dest.describe_table(TableName=table)
         if action & 1 == 1:
-            print("Table %s already exists.\nSkipping."%table)
+            print("Table %s already exists.\nSkipping." % table)
     except ClientError as e:
         if action & 1 == 1:
-            print("Creating table %s in destination database." % (table), end=' ')
+            print("Creating table %s in destination database." % table, end=' ')
             sys.stdout.flush()
             src_schema.pop('CreationDateTime')
             src_schema.pop('TableId')
@@ -59,28 +59,48 @@ for i in tables_num:
             src_schema.pop('TableArn')
             src_schema.pop('TableSizeBytes')
             src_schema.pop('TableStatus')
-            src_schema.pop('LatestStreamArn',None)
-            src_schema.pop('LatestStreamLabel',None)
-            src_schema['ProvisionedThroughput'].pop('LastDecreaseDateTime', None)
-            src_schema['ProvisionedThroughput'].pop('LastIncreaseDateTime', None)
+            src_schema.pop('LatestStreamArn', None)
+            src_schema.pop('LatestStreamLabel', None)
+            src_schema['ProvisionedThroughput'].pop(
+                'LastDecreaseDateTime', None)
+            src_schema['ProvisionedThroughput'].pop(
+                'LastIncreaseDateTime', None)
             src_schema['ProvisionedThroughput'].pop('NumberOfDecreasesToday')
-            dest.create_table(**src_schema)
-            sleep(5)
-            print("Table Created.")
+            a = dest.create_table(**src_schema)['TableDescription']
+            print("Creating Table", end='')
+            sys.stdout.flush()
+            while a['TableStatus'] == 'CREATING':
+                sleep(0.5)
+                print('.', end='')
+                sys.stdout.flush()
+                a = dest.describe_table(TableName=table)['Table']
+            print("\nTable Created.")
+            sys.stdout.flush()
         else:
-            print("Table %s doesn't exist in the destination."%table)
+            print("Table %s doesn't exist in the destination." % table)
             print("Skipping.")
+            sys.stdout.flush()
             continue
 
     if action & 2 == 2:
         print("Copying table %s." % table)
-        source_items = source.scan(TableName=table)['Items']
+        source_items = source.scan(TableName=table)
         print()
+        last_eval_key = source_items.get('LastEvaluatedKey',False)
+        source_items = source_items['Items']
         print("Total Items to copy:", str(num_items))
-        for ind, item in enumerate(source_items):
-            sleep(2)
-            dest.put_item(TableName=table, Item=item)
-            sys.stdout.write("\033[K")
-            print("(%s/%s) Write Progress: %s %%" %
-                  (str(ind+1), str(num_items), str((ind+1) * 100 // num_items)), end='\r')
+        l = 0
+        while True:
+            for ind, item in enumerate(source_items):
+                sleep(2)
+                dest.put_item(TableName=table, Item=item)
+                sys.stdout.write("\033[K")
+                print("(%s/%s) Write Progress: %s %%" %
+                      (str(l + 1), str(num_items), str((l + 1) * 100 // num_items)), end='\r')
+                l+=1
+            if not last_eval_key:
+                break
+            source_items = source.scan(TableName=table,ExclusiveStartKey=last_eval_key)
+            last_eval_key = source_items.get('LastEvaluatedKey',False)
+            source_items = source_items['Items']
         print()
