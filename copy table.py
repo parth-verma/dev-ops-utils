@@ -46,7 +46,7 @@ for i in tables_num:
     num_items = src_schema['ItemCount']
 
     try:
-        dest.describe_table(TableName=table)
+        dest_table = dest.describe_table(TableName=table)['Table']
         if action & 1 == 1:
             print("Table %s already exists.\nSkipping." % table)
     except ClientError as e:
@@ -66,14 +66,14 @@ for i in tables_num:
             src_schema['ProvisionedThroughput'].pop(
                 'LastIncreaseDateTime', None)
             src_schema['ProvisionedThroughput'].pop('NumberOfDecreasesToday')
-            a = dest.create_table(**src_schema)['TableDescription']
+            dest_table = dest.create_table(**src_schema)['TableDescription']
             print("Creating Table", end='')
             sys.stdout.flush()
-            while a['TableStatus'] == 'CREATING':
+            while dest_table['TableStatus'] == 'CREATING':
                 sleep(0.5)
                 print('.', end='')
                 sys.stdout.flush()
-                a = dest.describe_table(TableName=table)['Table']
+                dest_table = dest.describe_table(TableName=table)['Table']
             print("\nTable Created.")
             sys.stdout.flush()
         else:
@@ -91,8 +91,10 @@ for i in tables_num:
         print("Total Items to copy:", str(num_items))
         l = 0
         while True:
+            sleep_seconds = 1.0/(dest_table['ProvisionedThroughput']['WriteCapacityUnits']-1)
+            print("Sleep Seconds: " + str(sleep_seconds))
             for ind, item in enumerate(source_items):
-                sleep(2)
+                sleep(sleep_seconds)
                 dest.put_item(TableName=table, Item=item)
                 sys.stdout.write("\033[K")
                 print("(%s/%s) Write Progress: %s %%" %
