@@ -2,6 +2,7 @@ import boto3
 import sys
 from time import sleep
 from botocore.exceptions import ClientError
+import progressbar
 
 print("Enter the profile_name for the table where you want to copy from.")
 from_profile_name = input("Profile Name [default]: ").strip()
@@ -86,23 +87,25 @@ for i in tables_num:
         print("Copying table %s." % table)
         source_items = source.scan(TableName=table)
         print()
-        last_eval_key = source_items.get('LastEvaluatedKey',False)
+        last_eval_key = source_items.get('LastEvaluatedKey', False)
         source_items = source_items['Items']
         print("Total Items to copy:", str(num_items))
         l = 0
+        bar = progressbar.ProgressBar(max_value=num_items)
         while True:
-            sleep_seconds = 1.0/(dest_table['ProvisionedThroughput']['WriteCapacityUnits']-1)
+            sleep_seconds = 1.0 / (max([dest_table['ProvisionedThroughput']['WriteCapacityUnits'] - 1, 1]))
             print("Sleep Seconds: " + str(sleep_seconds))
             for ind, item in enumerate(source_items):
                 sleep(sleep_seconds)
                 dest.put_item(TableName=table, Item=item)
                 sys.stdout.write("\033[K")
-                print("(%s/%s) Write Progress: %s %%" %
-                      (str(l + 1), str(num_items), str((l + 1) * 100 // num_items)), end='\r')
-                l+=1
+                bar.update(l)
+
+                l += 1
             if not last_eval_key:
                 break
-            source_items = source.scan(TableName=table,ExclusiveStartKey=last_eval_key)
-            last_eval_key = source_items.get('LastEvaluatedKey',False)
-            source_items = source_items['Items']
+            source_items=source.scan(
+                TableName=table, ExclusiveStartKey=last_eval_key)
+            last_eval_key=source_items.get('LastEvaluatedKey', False)
+            source_items=source_items['Items']
         print()
