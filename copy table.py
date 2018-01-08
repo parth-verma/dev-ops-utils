@@ -18,7 +18,7 @@ source = boto3.Session(profile_name='default' if from_profile_name ==
 dest = boto3.Session(profile_name='default' if to_profile_name ==
                      '' else to_profile_name).client('dynamodb', use_ssl=False)
 
-tables = source.list_tables(Limit=10 * 4)['TableNames']
+tables = source.list_tables(Limit=100)['TableNames']
 tables.sort(key=lambda x: x.lower())
 for id, x in enumerate(tables):
     print(str(id) + '. ' + x)
@@ -94,11 +94,11 @@ for i in tables_num:
         bar = progressbar.ProgressBar(max_value=num_items)
         while True:
             sleep_seconds = 1.0 / (max([dest_table['ProvisionedThroughput']['WriteCapacityUnits'] - 1, 1]))
-            print("Sleep Seconds: " + str(sleep_seconds))
             for ind, item in enumerate(source_items):
                 sleep(sleep_seconds)
                 dest.put_item(TableName=table, Item=item)
                 sys.stdout.write("\033[K")
+                #print(l)
                 bar.update(l)
 
                 l += 1
