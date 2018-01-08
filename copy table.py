@@ -92,13 +92,15 @@ for i in tables_num:
         print("Total Items to copy:", str(num_items))
         l = 0
         bar = progressbar.ProgressBar(max_value=num_items)
+        bar.update(arg)
         while True:
             sleep_seconds = 1.0 / (max([dest_table['ProvisionedThroughput']['WriteCapacityUnits'] - 1, 1]))
             for ind, item in enumerate(source_items):
                 sleep(sleep_seconds)
                 dest.put_item(TableName=table, Item=item)
                 sys.stdout.write("\033[K")
-                #print(l)
+                if l > num_items:
+                    bar.max_value = l
                 bar.update(l)
 
                 l += 1
